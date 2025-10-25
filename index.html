@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generatore Verifiche C++ per il Prof. Borzumati</title>
+    <!-- Carica Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carica la libreria jsPDF per la generazione di PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Carica la libreria JSZip per l'archiviazione ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <!-- Configurazione del font per Tailwind -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Sfondo più chiaro */
+        }
+    </style>
+</head>
+<body>
+
+<div class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl bg-white shadow-2xl rounded-xl p-8 space-y-6 border border-blue-200">
+        <!-- Header dell'Applicazione -->
+        <header class="text-center pb-4 border-b-4 border-blue-600">
+            <h1 class="text-4xl font-extrabold text-blue-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="inline w-9 h-9 mr-2 -mt-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                Generatore Verifiche C++
+            </h1>
+            <p class="text-gray-600 mt-2 font-medium">Prof. Giuseppe Borzumati - Sezione: Logica e Strutture di Controllo (Durata: 1 ora)</p>
+        </header>
+
+        <!-- Form e Input -->
+        <div class="space-y-6">
+            <div>
+                <label for="numAlunni" class="block text-sm font-bold text-gray-700">Numero di Verifiche da Generare (Alunni):</label>
+                <input type="number" id="numAlunni" value="5" min="1" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-lg transition duration-150" placeholder="E.g., 5, 10, 25">
+            </div>
+
+            <button onclick="generateTests()" id="generateBtn" class="w-full flex items-center justify-center py-4 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-green-500 transition duration-300 transform hover:scale-[1.015] active:scale-[0.99]">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" viewBox="0 0 20 20" fill="currentColor"><path d="M3 17a1 1 0 01-1-1V6a1 1 0 011-1h5.172a2 2 0 011.414.586l3.656 3.656A2 2 0 0114.828 11H18a1 1 0 011 1v3a1 1 0 01-1 1h-6.172a2 2 0 01-1.414-.586l-3.656-3.656A2 2 0 015.172 9H3a1 1 0 01-1-1v-2h1a1 1 0 000-2H2a1 1 0 01-1-1V3a1 1 0 011-1h16a1 1 0 011 1v14a1 1 0 01-1 1H3zM9 9a1 1 0 001 1h6a1 1 0 100-2h-6a1 1 0 00-1 1z" /></svg>
+                Genera Archivio ZIP (Verifiche + Soluzioni Prof.)
+            </button>
+
+            <!-- Messaggio di Stato -->
+            <div id="statusMessage" class="text-center mt-4 text-base font-semibold text-gray-600 h-6"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const MAX_SCORE = 100;
+    const { jsPDF } = window.jspdf;
+
+    // Struttura dei Punteggi (Pratica/Teoria/Totale) per 100 punti totali, scalari
+    const scores = [
+        { P: 3, T: 2, Total: 5, difficulty: 'Facile' },
+        { P: 4, T: 3, Total: 7, difficulty: 'Facile' },
+        { P: 5, T: 4, Total: 9, difficulty: 'Facile' },
+        { P: 6, T: 4, Total: 10, difficulty: 'Facile' },
+        { P: 7, T: 5, Total: 12, difficulty: 'Complicato' },
+        { P: 8, T: 6, Total: 14, difficulty: 'Complicato' },
+        { P: 10, T: 8, Total: 18, difficulty: 'Complicato' },
+        { P: 12, T: 10, Total: 22, difficulty: 'Complicato' },
+        { P: 1, T: 1, Total: 2, difficulty: 'Concettuale' },
+        { P: 1, T: 1, Total: 2, difficulty: 'Impossibile (AI Check)' }
+    ];
+
+    // Mappa degli Esercizi (Tracce Lunghe, Soluzioni e Spiegazioni)
+    const exerciseTemplates = [
+        // Esercizio 1 (IF/ELSE, LOGICA BOOLEANA)
+        { 
+            topics: ['if/else', 'bool', 'operatori logici'], 
+            code_snippet: seed => {
+                const livello1 = seed % 6 + 1;
+                const livello2 = seed % 6 + 7;
+                return {
+                    code: `int livello = ${livello1};\nbool utentePro = true;\nif (livello < 5 || (livello >= 8 && !utentePro))\n    std::cout << "Livello Introduttivo";\nelse\n    std::cout << "Livello Avanzato";`,
+                    params: { livello1, livello2 }
+                };
+            },
+            trace: (seed, params) => {
+                return `Analisi di Condizione Booleana: Dato un contesto in cui una variabile intera 'livello' rappresenta la difficoltà di un gioco (da 1 a 10) e una variabile booleana 'utentePro' indica se l'utente è esperto, analizza il seguente snippet C++. Indica l'output preciso per il caso 1: livello = ${params.livello1} e utentePro è vero, e il caso 2: livello = ${params.livello2} e utentePro è falso. Descrivi il ruolo dell'operatore logico OR (||) e del NOT (!):\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            }, 
+            solution: (params) => {
+                const output1 = (params.livello1 < 5 || (params.livello1 >= 8 && !true)) ? "Livello Introduttivo" : "Livello Avanzato";
+                const output2 = (params.livello2 < 5 || (params.livello2 >= 8 && !false)) ? "Livello Introduttivo" : "Livello Avanzato";
+                const code_snip = `int livello = ${params.livello1};\nbool utentePro = true; // Caso 1\n// Caso 2: livello = ${params.livello2}, utentePro = false\n\n#include <iostream>\nint main() {\n    // Simulazione Caso 1\n    std::cout << "Caso 1: ";\n    int livello_1 = ${params.livello1};\n    bool utentePro_1 = true;\n    if (livello_1 < 5 || (livello_1 >= 8 && !utentePro_1))\n        std::cout << "Livello Introduttivo";\n    else\n        std::cout << "Livello Avanzato";\n    \n    // Simulazione Caso 2\n    std::cout << "\\nCaso 2: ";\n    int livello_2 = ${params.livello2};\n    bool utentePro_2 = false;\n    if (livello_2 < 5 || (livello_2 >= 8 && !utentePro_2))\n        std::cout << "Livello Introduttivo";\n    else\n        std::cout << "Livello Avanzato";\n    \n    return 0;\n}`;
+                return { 
+                    output: `Caso 1 (livello=${params.livello1}, utentePro=true): ${output1}\nCaso 2 (livello=${params.livello2}, utentePro=false): ${output2}`,
+                    code: code_snip
+                };
+            },
+            explanation: `L'operatore OR (||) garantisce che la condizione sia vera se almeno una delle due sotto-condizioni è vera. L'operatore NOT (!) nega il valore booleano di 'utentePro'. Il Caso 1 si risolve immediatamente in VERO dato che ${params => params.livello1} è < 5. Il Caso 2 testa l'operatore AND (&&) combinato con NOT: dato che utentePro è falso, !utentePro è VERO, quindi si verifica se ${params => params.livello2} >= 8, risultando in un output specifico in base al valore generato dal seed.`
+        },
+        
+        // Esercizio 2 (VARIABILI TEMPORANEE, OPERATORI UNARI)
+        { 
+            topics: ['variabili temporanee', 'operatori unari'], 
+            code_snippet: seed => {
+                const c = seed % 5 + 1;
+                const pT = seed % 5 + 10;
+                return {
+                    code: `int contatore = ${c}, punteggioTemporaneo = ${pT};\npunteggioTemporaneo = contatore++;\ncontatore = ++punteggioTemporaneo;`,
+                    params: { c_orig: c, pT_orig: pT }
+                };
+            },
+            trace: (seed, params) => {
+                return `Effetti Collaterali degli Operatori Unari: In un frammento di codice che gestisce un contatore e un punteggio temporaneo, calcola il valore finale di \`contatore\` e \`punteggioTemporaneo\` se inizialmente \`contatore = ${params.c_orig}\` e \`punteggioTemporaneo = ${params.pT_orig}\`. Spiega in dettaglio la differenza fondamentale tra l'operatore pre-incremento (\`++a\`) e post-incremento (\`a++\`):\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            },
+            solution: (params) => {
+                let c = params.c_orig; 
+                let pT = params.pT_orig; 
+                pT = c++; // pT = c_orig. c = c_orig + 1.
+                c = ++pT; // pT = pT + 1. c = pT.
+                
+                const code_snip = `#include <iostream>\nint main() {\n    int contatore = ${params.c_orig}, punteggioTemporaneo = ${params.pT_orig};\n    punteggioTemporaneo = contatore++; // Post-incremento: pT prende il valore di 'contatore' prima dell'incremento.\n    contatore = ++punteggioTemporaneo; // Pre-incremento: pT viene incrementato PRIMA di essere assegnato a 'contatore'.\n    std::cout << "Contatore Finale: " << contatore << ", Punteggio Finale: " << punteggioTemporaneo;\n    return 0;\n}`;
+                return {
+                    output: `Valore finale: contatore = ${c}, punteggioTemporaneo = ${pT}\nPassaggi Intermedi: 1) pT diventa ${params.c_orig}, c diventa ${params.c_orig + 1}. 2) pT diventa ${params.c_orig + 1}, c diventa ${params.c_orig + 1}.`,
+                    code: code_snip
+                };
+            },
+            explanation: `L'operatore post-incremento (\`c++\`) restituisce il valore *prima* di incrementarlo. L'operatore pre-incremento (\`++pT\`) incrementa il valore *prima* di restituirlo. Nel primo passaggio, \`pT\` assume il valore iniziale di \`contatore\` (${params => params.c_orig}), e solo *dopo* \`contatore\` viene incrementato. Nel secondo passaggio, \`pT\` viene immediatamente incrementato a ${params => params.c_orig + 1} e questo valore è assegnato a \`contatore\`.`
+        },
+        
+        // Esercizio 3 (FOR, OPERATORI LOGICI)
+        { 
+            topics: ['for', 'operatori logici', 'prestazioni'], 
+            code_snippet: seed => {
+                const N = seed % 10 + 10;
+                return {
+                    code: `int somma = 0;\nfor (int i = 1; i * i <= ${N}; i++) {\n    if (i % 2 == 0) {\n        somma += i;\n    }\n}`,
+                    params: { N }
+                };
+            },
+            trace: (seed, params) => {
+                return `Ciclo 'for' e Condizione di Terminazione: Si vuole calcolare la somma dei numeri pari la cui radice quadrata è minore di un certo limite N. Qual è il valore finale di \`somma\` e quante iterazioni del ciclo \`for\` vengono effettivamente eseguite? Il limite N è pari a ${params.N}. Spiega il motivo della condizione di terminazione non standard (i * i <= N):\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            }, 
+            solution: (params) => {
+                const N = params.N;
+                let somma = 0;
+                let iterations = 0;
+                for (let i = 1; i * i <= N; i++) {
+                    iterations++;
+                    if (i % 2 === 0) {
+                        somma += i;
+                    }
+                }
+                const code_snip = `#include <iostream>\nint main() {\n    int somma = 0;\n    int N = ${N};\n    int iterations = 0;\n    for (int i = 1; i * i <= N; i++) {\n        iterations++;\n        if (i % 2 == 0) {\n            somma += i;\n        }\n    }\n    std::cout << "Somma Finale: " << somma << ", Iterazioni: " << iterations;\n    return 0;\n}`;
+                return {
+                    output: `Numero di iterazioni eseguite: ${iterations}\nValore finale di somma: ${somma}`,
+                    code: code_snip
+                };
+            },
+            explanation: `La condizione \`i * i <= N\` è preferita perché evita calcoli in virgola mobile e la funzione \`sqrt()\` che ha un overhead prestazionale, lavorando esclusivamente con l'aritmetica intera, più efficiente in C++. Il ciclo si ferma quando il quadrato di \`i\` supera N. La somma considera solo i valori pari di \`i\`.`
+        },
+        
+        // Esercizio 4 (WHILE, LOGICA BOOLEANA)
+        { 
+            topics: ['while', 'logica booleana', 'if/else'], 
+            code_snippet: seed => {
+                const a_start = seed % 5 + 2;
+                const b_start = seed % 5 + 1;
+                const limit = seed % 5 + 8;
+                return {
+                    code: `int a = ${a_start}, b = ${b_start};\nwhile (a < ${limit} && b <= a) {\n    a++;\n    b += a % 2;\n}\nstd::cout << "A: " << a << ", B: " << b;`,
+                    params: { a_start, b_start, limit }
+                };
+            },
+            trace: (seed, params) => {
+                return `Simulazione di Logica Condizionale Composta: Prevedi l'output finale del seguente codice che utilizza una logica booleana complessa all'interno della condizione \`while\`. Le variabili iniziali sono \`a = ${params.a_start}\` e \`b = ${params.b_start}\`. Giustifica ogni iterazione e spiega in quale specifico momento la condizione \`a < ${params.limit} && b <= a\` viene valutata come falsa:\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            },
+            solution: (params) => {
+                let a = params.a_start;
+                let b = params.b_start;
+                const limit = params.limit;
+
+                while (a < limit && b <= a) {
+                    a++;
+                    b += a % 2;
+                }
+                
+                const code_snip = `#include <iostream>\nint main() {\n    int a = ${params.a_start}, b = ${params.b_start};\n    const int LIMIT = ${limit};\n    std::cout << "START: A=" << a << ", B=" << b << "\\n";\n    while (a < LIMIT && b <= a) {\n        a++;\n        b += a % 2; \n        std::cout << "Iterazione: A=" << a << ", B=" << b << "\\n";\n    }\n    std::cout << "OUTPUT FINALE: A: " << a << ", B: " << b << "\\n";\n    return 0;\n}`;
+                return {
+                    output: `Output finale: A: ${a}, B: ${b}`,
+                    code: code_snip
+                };
+            },
+            explanation: `Il ciclo continua finché ENTRAMBE le condizioni sono vere (operatore logico AND \`&&\`). Il ciclo uscirà se \`a\` raggiunge \`${params => params.limit}\` O se \`b\` supera \`a\` (\`b > a\`). L'incremento di \`b\` è condizionato dal fatto che \`a\` sia dispari dopo l'incremento. L'uscita avviene quando almeno una delle due condizioni componenti della \`while\` fallisce, dato che \`&&\` impone la verità di entrambe.`
+        },
+        
+        // Esercizio 5 (DO-WHILE, CONTINUE)
+        { 
+            topics: ['do-while', 'continue', 'rifattorizzazione'], 
+            code_snippet: seed => {
+                const c_start = seed % 5 + 1;
+                const limit = seed % 5 + 6;
+                return {
+                    code: `int contatore = ${c_start}, limite = ${limit};\ndo {\n    contatore++;\n    if (contatore % 3 == 0) continue;\n} while (contatore < limite);`,
+                    params: { c_start, limit }
+                };
+            },
+            trace: (seed, params) => {
+                return `Rifattorizzazione di Cicli con 'continue': Riscrivi il ciclo \`do-while\` qui sotto utilizzando un'equivalente struttura \`for\`, mantenendo la stessa logica. Qual è il valore finale di \`contatore\` se inizia da \`${params.c_start}\` e \`limite = ${params.limit}\`? Spiega perché la clausola \`continue\` è considerata una pratica da evitare in codice professionale:\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            }, 
+            solution: (params) => {
+                let c = params.c_start;
+                const limit = params.limit;
+                // Calcolo del risultato
+                do { c++; if (c % 3 === 0) continue; } while (c < limit);
+                
+                const code_snip = `#include <iostream>\nint main() {\n    const int LIMIT = ${limit};\n    // Struttura for equivalente:\n    for (int contatore = ${params.c_start}; contatore < LIMIT; ) {\n        contatore++;\n        if (contatore % 3 == 0) {\n            continue; // Equivalente per il calcolo, ma sconsigliato.\n        }\n        // La parte di codice da eseguire qui non c'è, ma il loop funziona\n    }\n    std::cout << "Contatore Finale (calc): " << ${c};\n    // Metodo alternativo, più pulito, per il for:\n    int contatore_clean = ${params.c_start};\n    for (; contatore_clean < LIMIT; contatore_clean++) {\n        if ((contatore_clean + 1) % 3 != 0) {\n            // Fai qualcosa\n        }\n    }\n    return 0;\n}`;
+                return {
+                    output: `Valore finale di contatore: ${c}`,
+                    code: code_snip
+                };
+            },
+            explanation: `Il \`continue\` forza un salto immediato alla condizione di test del ciclo, interrompendo l'iterazione corrente. Riscrivere con \`for\` è possibile, ma la prassi migliore è evitare \`continue\`. Si dovrebbe usare una condizione \`if (contatore % 3 != 0)\` per racchiudere il codice da eseguire, eliminando il salto. Il \`do-while\` esegue sempre un'iterazione, in questo caso l'incremento di \`contatore\` avviene sempre almeno una volta, garantendo l'avanzamento.`
+        },
+        
+        // Esercizio 6 (FOR, VARIABILI TEMPORANEE - Scrittura Codice)
+        { 
+            topics: ['for', 'variabili temporanee', 'sequenze'], 
+            code_snippet: seed => {
+                const start = seed % 5 + 5;
+                const end = seed % 5 + 15;
+                return { params: { start, end } };
+            },
+            trace: (seed, params) => {
+                return `Implementazione con Variabili Temporanee per Sequenze: Scrivi un programma completo (con la funzione \`main\`) che, usando un ciclo \`for\`, stampi i numeri da ${params.start} a ${params.end} ma salti la stampa se il numero corrente è un numero di Fibonacci (es. 1, 1, 2, 3, 5, 8, 13...). Descrivi quali variabili temporanee devi introdurre per tenere traccia dei valori di Fibonacci e giustifica la loro dichiarazione all'esterno del ciclo.`;
+            },
+            solution: (params) => {
+                const code_snip = `#include <iostream>\n\nint main() {\n    const int START = ${params.start};\n    const int END = ${params.end};\n    \n    // VARIABILI TEMPORANEE (dichiarate fuori dal ciclo per mantenere lo stato)\n    int f0 = 0, f1 = 1;\n    int nextFib = f0 + f1;\n    \n    std::cout << "Numeri non Fibonacci tra " << START << " e " << END << ":\\n";\n    \n    for (int i = START; i <= END; i++) {\n        // LOGICA DI AGGIORNAMENTO FIBONACCI\n        while (nextFib < i) {\n            f0 = f1;\n            f1 = nextFib;\n            nextFib = f0 + f1; \n        }\n        \n        // LOGICA DI STAMPA\n        if (i != nextFib) {\n            std::cout << i << " ";\n        }\n    }\n    std::cout << "\\n";\n    return 0;\n}`;
+                return {
+                    output: `Il programma stampa tutti i numeri tra ${params.start} e ${params.end} ad eccezione dei numeri di Fibonacci compresi in quell'intervallo (come 8, 13, ecc.).`,
+                    code: code_snip
+                };
+            },
+            explanation: `Sono necessarie \`f0\`, \`f1\` e \`nextFib\` come variabili temporanee. Devono essere dichiarate *fuori* dal ciclo \`for\` perché il loro stato (la posizione corrente nella sequenza di Fibonacci) deve essere mantenuto tra le iterazioni. Se fossero interne, verrebbero resettate ad ogni ciclo, fallendo il calcolo della sequenza.`
+        },
+        
+        // Esercizio 7 (IF/ELSE, LOGICA BOOLEANA, CORREZIONE)
+        { 
+            topics: ['while', 'logica booleana', 'operatori logici', 'De Morgan'], 
+            code_snippet: seed => {
+                const a = seed % 10 + 10;
+                const b = seed % 10 + 2;
+                return {
+                    code: `int a = ${a}, b = ${b};\nbool risultato = (a <= 10) || (b % 2 != 0);\nif (!risultato)\n    std::cout << "OK";\nelse\n    std::cout << "ERRORE";`,
+                    params: { a_val: a, b_val: b }
+                };
+            },
+            trace: (seed, params) => {
+                return `Analisi e Correzione di Errori Logici: L'obiettivo è che la stampa "OK" avvenga solo se \`a\` è strettamente maggiore di 10 E \`b\` è pari. Correggi la logica booleana nell'istruzione \`if\` sapendo che \`a = ${params.a_val}\` e \`b = ${params.b_val}\`. Utilizza le Leggi di De Morgan (o una spiegazione logica equivalente) per spiegare perché la negazione attuale è corretta per l'obiettivo:\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            },
+            solution: (params) => {
+                const code_snip = `#include <iostream>\nint main() {\n    // Obiettivo: a > 10 AND b % 2 == 0\n    int a = ${params.a_val}, b = ${params.b_val};\n    // 'risultato' è la negazione dell'obiettivo (a <= 10 OR b % 2 != 0)\n    bool risultato = (a <= 10) || (b % 2 != 0);\n    \n    // L'istruzione finale è corretta per l'obiettivo:\n    if (!risultato)\n        std::cout << "OK";\n    else\n        std::cout << "ERRORE";\n    return 0;\n}`;
+                return {
+                    output: `Soluzione: Il codice è *già corretto*.\nIl risultato finale per a=${params.a_val}, b=${params.b_val} è: ${(params.a_val > 10 && params.b_val % 2 === 0) ? "OK" : "ERRORE"}.`,
+                    code: code_snip
+                };
+            },
+            explanation: `La condizione è corretta in base alle Leggi di De Morgan: \`!(A OR B)\` è logicamente equivalente a \`!A AND !B\`. Applicando questa legge: \`!((a <= 10) || (b % 2 != 0))\` è equivalente a \`!(a <= 10) && !(b % 2 != 0)\`, che si traduce in \`(a > 10) && (b % 2 == 0)\`. La variabile \`risultato\` è il "fallimento dell'obiettivo", e la negazione \`!risultato\` è l'obiettivo raggiunto.`
+        },
+        
+        // Esercizio 8 (FOR, OVERFLOW)
+        { 
+            topics: ['for', 'overflow', 'limiti di tipo', 'debugging'], 
+            code_snippet: seed => {
+                const limit = 2147483647; // INT_MAX
+                const start = limit - (seed % 5 + 1);
+                return {
+                    code: `for (int i = ${start}; i < ${limit}; i++) {\n    // Contatore destinato all'overflow\n    //...\n}`,
+                    params: { start, limit }
+                };
+            },
+            trace: (seed, params) => {
+                return `Comportamento di Overflow e Limiti di Tipi: Considera un ciclo \`for\` che utilizza una variabile \`int\` standard (valore massimo 2.147.483.647). Quale sarà l'output o il comportamento del programma se il ciclo viene eseguito a partire dal valore ${params.start} e l'incremento dovesse portarlo oltre il limite massimo? Spiega in profondità il concetto di overflow in un ciclo e identifica precisamente quale variabile può causare un potenziale errore:\n\n\`\`\`cpp\n// Codice da analizzare in verifica\n\`\`\``;
+            },
+            solution: (params) => {
+                const code_snip = `#include <iostream>\n#include <limits>\nint main() {\n    int counter = ${params.start};\n    std::cout << "INT_MAX: " << std::numeric_limits<int>::max() << "\\n";\n    std::cout << "Inizio: " << counter << "\\n";\n    while (counter < ${params.limit} + 10) { // Simula un limite per far scattare l'overflow\n        if (counter == ${params.limit}) {\n            std::cout << "MAX RAGGIUNTO: " << counter << "\\n";\n        }\n        counter++;\n        if (counter < 0) {\n            std::cout << "OVERFLOW E WRAP-AROUND! Nuovo valore negativo: " << counter << "\\n";\n            break;\n        }\n    }\n    return 0;\n}`;
+                return {
+                    output: `La variabile 'i' raggiunge il valore massimo di INT (2.147.483.647). Al successivo incremento, l'overflow causa il *wrap-around* a -2.147.483.648 (INT_MIN per interi con segno).`,
+                    code: code_snip
+                };
+            },
+            explanation: `L'**integer overflow** si verifica quando un valore supera il limite di rappresentazione del suo tipo (e.g., \`int\`). La variabile che causa l'errore è \`i\`. Nei tipi con segno come \`int\`, l'overflow fa sì che il valore "si avvolga" al minimo negativo (wrap-around), potenzialmente trasformando un ciclo con condizione positiva (\`i < limite\`) in un loop infinito o errato, dato che \`i\` diventa improvvisamente molto piccolo e negativo.`
+        },
+
+        // Esercizio 9 (Concettuale)
+        { 
+            topics: ['while', 'for', 'do-while', 'variabili temporanee'], 
+            code_snippet: seed => { return { params: {} }; },
+            trace: seed => `Domanda Concettuale: Supponiamo di dover analizzare una serie di dati (e.g., letture da un sensore) fino a quando la media supera una soglia definita. Quale struttura di controllo (tra \`while\`, \`do-while\` o \`for\`) è semanticamente più appropriata se è *garantito* che il primo dato deve essere sempre letto e analizzato? Descrivi inoltre due variabili temporanee essenziali per calcolare la media e spiega come gestisci l'inizializzazione del loro valore per garantire la correttezza del calcolo.`, 
+            solution: seed => {
+                const code_snip = `// Esempio Concettuale\nfloat media = 0.0;\nfloat soglia = 5.0;\nint dato;\n\n// Struttura do-while garantisce la prima esecuzione\ndo {\n    std::cout << "Inserisci dato: ";\n    std::cin >> dato;\n    // Logica di accumulo e ricalcolo della media\n} while (media <= soglia);`;
+                return { 
+                    output: `Struttura semanticamente più appropriata: do-while.\nVariabili Temporanee essenziali: somma, contatore.`,
+                    code: code_snip
+                };
+            },
+            explanation: `La struttura \`do-while\` è ideale perché assicura che il corpo del ciclo venga eseguito almeno una volta, soddisfacendo il requisito che il primo dato debba essere sempre analizzato, prima di testare la condizione di uscita (media > soglia). Le variabili temporanee essenziali sono \`int somma = 0;\` e \`int contatore = 0;\`. Devono essere inizializzate a zero e dichiarate *al di fuori* del ciclo per mantenere l'accumulo dello stato corretto attraverso tutte le iterazioni. Inizializzare a zero è l'unico modo per avere una media corretta e non influenzata da valori iniziali arbitrari.`
+        },
+        
+        // Esercizio 10 (LIMITAZIONE VARIABILI - Scrittura Codice)
+        { 
+            topics: ['tutti', 'ottimizzazione', 'variabili temporanee'], 
+            code_snippet: seed => {
+                const N = seed % 8 + 3;
+                return { params: { N } };
+            },
+            trace: (seed, params) => {
+                return `Scrivi un programma completo (con la funzione \`main\`) che calcola il fattoriale di un numero intero positivo N (es. ${params.N}), ma devi implementare il ciclo di calcolo *senza* dichiarare alcuna variabile ausiliaria (variabile temporanea) oltre al contatore del ciclo e al risultato finale. Questo esercizio testa l'uso minimale delle risorse.`;
+            }, 
+            solution: (params) => {
+                const code_snip = `#include <iostream>\n\nint main() {\n    const int N = ${params.N};\n    // Il risultato finale funge da accumulatore: nessuna variabile ausiliaria extra è usata.\n    // Si usa long long per prevenire l'overflow per N > 12.\n    long long risultato = 1; \n    \n    std::cout << "Calcolo Fattoriale di " << N << "\\n";\n    // 'i' è il contatore del ciclo richiesto (Variabile non ausiliaria, ma di controllo)\n    for (int i = 1; i <= N; i++) {\n        risultato *= i;\n    }\n    \n    std::cout << "Fattoriale di " << N << " è: " << risultato << "\\n";\n    return 0;\n}`;
+                let risultato = 1;
+                for (let i = 1; i <= params.N; i++) { risultato *= i; }
+                return {
+                    output: `Il fattoriale di ${params.N} è ${risultato}. Il codice rispetta il vincolo usando solo il contatore (\`i\`) e il risultato finale (\`risultato\`).`,
+                    code: code_snip
+                };
+            },
+            explanation: `Il vincolo di non usare variabili ausiliarie aggiuntive è gestito utilizzando la variabile \`risultato\` non solo come output finale, ma anche come accumulatore intermedio (agisce come variabile di stato). \`i\` è la variabile di controllo standard del ciclo e non è considerata "ausiliaria" nel senso stretto. Si usa \`long long\` per garantire che il prodotto non vada in overflow, dato che il fattoriale cresce esponenzialmente.`
+        }
+    ];
+    
+    // Assegna i punteggi dinamici agli oggetti template
+    for (let i = 0; i < exerciseTemplates.length; i++) {
+        Object.assign(exerciseTemplates[i], scores[i]);
+        exerciseTemplates[i].id = i + 1;
+    }
+
+
+    /**
+     * Helper per stampare testo con a capo automatico.
+     * @param {jsPDF} doc
+     * @param {string} text
+     * @param {number} x
+     * @param {number} y
+     * @param {number} maxWidth
+     * @param {number} lineHeight
+     * @param {boolean} isCode
+     * @returns {number} La nuova coordinata Y dopo la stampa.
+     */
+    function printWrappedText(doc, text, x, y, maxWidth, lineHeight, isCode = false) {
+        
+        const cleanText = text.replace(/```cpp/g, '@@CODE_START@@').replace(/```/g, '@@CODE_END@@').replace(/\n/g, '@@NEWLINE@@');
+        const lines = doc.splitTextToSize(cleanText, maxWidth);
+        
+        let currentY = y;
+        let inCodeBlock = false;
+
+        for (const line of lines) {
+            let lineToPrint = line;
+            
+            if (line.includes('@@CODE_START@@')) {
+                inCodeBlock = true;
+                doc.setFont('Inter', 'bold');
+                doc.setFontSize(9);
+                doc.setTextColor(30, 64, 175);
+                lineToPrint = line.replace('@@CODE_START@@', '```cpp');
+            } else if (line.includes('@@CODE_END@@')) {
+                 lineToPrint = line.replace('@@CODE_END@@', '```');
+                 inCodeBlock = false;
+                 doc.setFont('Inter', 'normal');
+                 doc.setFontSize(10); 
+                 doc.setTextColor(0, 0, 0); 
+            } 
+            
+            // Stampa la riga
+            doc.text(lineToPrint.replace(/@@NEWLINE@@/g, ''), x, currentY);
+            currentY += lineHeight;
+
+            // Se siamo dentro il codice, manteniamo il font piccolo e blu
+            if (inCodeBlock) {
+                 doc.setFont('Inter', 'bold'); 
+                 doc.setFontSize(9);
+                 doc.setTextColor(30, 64, 175); 
+            }
+        }
+        
+        return currentY;
+    }
+
+
+    /**
+     * Disegna l'intestazione standard della verifica per lo Studente.
+     * @param {jsPDF} doc
+     */
+    function drawHeaderStudent(doc) {
+        // Intestazione Fissa (Header)
+        doc.setFont('Inter', 'black'); // Usiamo Black per maggiore impatto
+        doc.setFontSize(10);
+        doc.setTextColor(17, 24, 39); // Gray-900
+        doc.text(`Verifica prodotta da Prof. Giuseppe Borzumati - Verifica di Programmazione C++`, doc.internal.pageSize.getWidth() / 2, 10, { align: 'center' });
+        
+        // Intestazione Dati Studente (Sotto l'Header Fisso)
+        doc.setFont('Inter', 'normal');
+        doc.setFontSize(10);
+        const margin = 15;
+        const lineSpacing = 8;
+        
+        let y_start = 10 + lineSpacing; 
+        doc.text(`Nome: _________________________ Cognome: _________________________ Data: _________________________`, margin, y_start);
+        
+        doc.text(`Classe: _________________________ Indirizzo: _________________________`, margin, y_start + lineSpacing);
+        
+        return y_start + lineSpacing * 2 + 3;
+    }
+
+    /**
+     * Disegna l'intestazione per il file Soluzioni.
+     * @param {jsPDF} doc
+     * @param {number} studentId
+     */
+    function drawHeaderSolution(doc, studentId) {
+        doc.setFont('Inter', 'black');
+        doc.setFontSize(12);
+        doc.setTextColor(185, 28, 28); // Red-700
+        doc.text(`SOLUZIONI RISERVATE (Alunno ${studentId}) - C++ Borzumati`, doc.internal.pageSize.getWidth() / 2, 10, { align: 'center' });
+        doc.setTextColor(0, 0, 0); // Reset color
+        return 18;
+    }
+
+    /**
+     * Disegna il piè di pagina (Footer).
+     * @param {jsPDF} doc
+     * @param {number} pageNumber
+     * @param {number} totalPages
+     * @param {boolean} isSolution
+     */
+    function drawFooter(doc, pageNumber, totalPages, isSolution) {
+        doc.setFont('Inter', 'normal');
+        doc.setFontSize(8);
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 15;
+        
+        if (!isSolution) {
+            // Piè di pagina Richiesto per Studente
+            doc.setFontSize(9);
+            doc.setTextColor(75, 85, 99);
+            doc.text(`Nome: _______________ Cognome: _______________ Classe: _______________ Data: _______________`, margin, pageHeight - 10, { align: 'left' });
+        } else {
+            // Piè di pagina per Soluzioni
+            doc.setFontSize(9);
+            doc.setTextColor(153, 27, 27); // Deep Red
+            doc.text(`File Soluzioni Ufficiali - Corrispondente a Verifica Alunno ${pageNumber} (Pagina ${pageNumber} di ${totalPages})`, margin, pageHeight - 10, { align: 'left' });
+        }
+
+        // Numero di pagina
+        doc.setTextColor(17, 24, 39);
+        doc.text(`Pagina ${pageNumber} di ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    }
+
+    /**
+     * Genera un set unico di 10 esercizi basato sul seed (ID studente).
+     * @param {number} studentId
+     * @returns {Array<Object>}
+     */
+    function getStudentExercises(studentId) {
+        // Seed base per la randomizzazione unica per alunno
+        const seed = studentId * 100 + 1; 
+        
+        // Mappa il punteggio e genera la traccia/soluzione finale con il seed specifico
+        return exerciseTemplates.map((ex, index) => {
+            const currentSeed = seed + index;
+            const codeData = ex.code_snippet(currentSeed);
+            const params = codeData.params || {};
+
+            // La traccia usa i parametri
+            const traceText = ex.trace(currentSeed, params).replace(/\${params\.(.*?)}/g, (match, p1) => params[p1]);
+            
+            // La soluzione usa i parametri
+            const solutionData = ex.solution(params);
+            const solutionText = solutionData.output.replace(/\${params\.(.*?)}/g, (match, p1) => params[p1]);
+            const solutionCode = solutionData.code.replace(/\${params\.(.*?)}/g, (match, p1) => params[p1]);
+            
+            // La spiegazione usa i parametri
+            const explanationText = ex.explanation.replace(/\${params\.(.*?)}/g, (match, p1) => params[p1]);
+
+            return {
+                id: index + 1,
+                P: ex.P, 
+                T: ex.T, 
+                Total: ex.Total, 
+                trace: traceText,
+                traceCode: codeData.code,
+                solution: solutionText,
+                solutionCode: solutionCode,
+                explanation: explanationText,
+                topics: ex.topics,
+            };
+        });
+    }
+
+    /**
+     * Genera il PDF *dello studente* con la griglia dettagliata.
+     * @param {number} studentId
+     * @returns {Promise<Blob>}
+     */
+    async function generateStudentPdf(studentId) {
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        const textWidth = pageWidth - 2 * margin;
+        const lineHeight = 5;
+        let y = 0;
+        const exercises = getStudentExercises(studentId);
+        
+        // ======================= SEZIONE A: TRACCE ESERCIZI =======================
+        y = drawHeaderStudent(doc);
+        y += 5;
+
+        // Titolo Sezione A
+        doc.setFont('Inter', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(30, 64, 175); 
+        doc.text(`SEZIONE A: Tracce Esercizi (Punteggio Totale: ${MAX_SCORE})`, pageWidth / 2, y, { align: 'center' });
+        doc.setTextColor(0, 0, 0); 
+        y += 8;
+
+        for (let i = 0; i < exercises.length; i++) {
+            const ex = exercises[i];
+            
+            if (y > pageHeight - 50) {
+                drawFooter(doc, doc.internal.pages.length - 1, '?', false);
+                doc.addPage();
+                y = drawHeaderStudent(doc);
+                y += 5;
+            }
+            
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(4, 120, 87); // Green
+            doc.text(`Esercizio ${ex.id} (Punti Max: ${ex.Total})`, margin, y);
+            y += 5;
+            
+            doc.setFont('Inter', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            
+            const traceText = ex.trace;
+            const parts = traceText.split('```cpp\n');
+            
+            // 1. Parte descrittiva prima del codice
+            y = printWrappedText(doc, parts[0].trim(), margin, y, textWidth, lineHeight) + 2;
+
+            // 2. Blocco di codice
+            if (ex.traceCode) {
+                const codeBlock = ex.traceCode;
+                const codeLines = codeBlock.split('\n').length;
+                const codeHeight = codeLines * 4.5 + 4; 
+                
+                if (y + codeHeight + 10 > pageHeight - 20) {
+                    drawFooter(doc, doc.internal.pages.length - 1, '?', false);
+                    doc.addPage();
+                    y = drawHeaderStudent(doc);
+                    y += 5;
+                }
+                
+                doc.setFont('Inter', 'bold');
+                doc.setFontSize(9);
+                doc.setFillColor(240, 244, 255); // Light Blue Background
+                doc.rect(margin, y, textWidth, codeHeight, 'F');
+                
+                y = printWrappedText(doc, codeBlock, margin + 2, y + 3, textWidth - 4, 4.5, true) + 2; 
+                doc.setFont('Inter', 'normal'); 
+            }
+            
+            y += 5; 
+        }
+
+        // --- Finalizzazione Tracce ---
+        const totalPagesTraces = doc.internal.pages.length - 1;
+        drawFooter(doc, totalPagesTraces, '?', false);
+
+
+        // ======================= SEZIONE B: GRIGLIE DI ATTRIBUZIONE PUNTEGGI =======================
+        doc.addPage();
+        y = drawHeaderStudent(doc);
+        y += 5;
+
+        // Titolo Sezione B
+        doc.setFont('Inter', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(190, 18, 60); // Red
+        doc.text(`SEZIONE B: Griglie di Attribuzione Punteggi e Giustificazione`, pageWidth / 2, y, { align: 'center' });
+        doc.setTextColor(0, 0, 0); 
+        y += 8;
+
+        // Istruzione sulla Chiarezza
+        doc.setFont('Inter', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(234, 88, 12); 
+        y = printWrappedText(doc, "ATTENZIONE: Le risposte non chiare o ambigue otterranno un massimo di 0.50 punti per ogni componente (Pratica o Teorica). Chiarezza e Precisione sono Criteri ESSENZIALI.", margin, y, textWidth, 5) + 3;
+        doc.setTextColor(0, 0, 0); 
+
+        // Griglie Esercizi
+        for (let i = 0; i < exercises.length; i++) {
+            const ex = exercises[i];
+            
+            if (y > pageHeight - 110) { 
+                drawFooter(doc, doc.internal.pages.length - 1, '?', false);
+                doc.addPage();
+                y = drawHeaderStudent(doc);
+                y += 5;
+            }
+
+            // Titolo Esercizio
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(4, 120, 87); 
+            doc.text(`Esercizio ${ex.id} (Punti Max: ${ex.Total})`, margin, y);
+            y += 5;
+            
+            // --- GRIGLIA DI ATTRIBUZIONE DEL PUNTEGGIO E DETTAGLIO CHIAREZZA ---
+            const gridX = margin;
+            const gridY = y;
+            const gridWidth = textWidth;
+            const colWidths = [gridWidth * 0.45, gridWidth * 0.2, gridWidth * 0.15, gridWidth * 0.2]; // Componente, Max Punti, Punti Max Chiarezza, Punti Ottenuti
+            const cellHeight = 6;
+            let currentGridY = gridY;
+
+            // Intestazione
+            doc.setFillColor(224, 231, 255); // Blue-100
+            doc.rect(gridX, currentGridY, gridWidth, cellHeight, 'F');
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(30, 64, 175); 
+            doc.text("Componente di Valutazione", gridX + colWidths[0] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("Punti Max", gridX + colWidths[0] + colWidths[1] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("P. Chiaro/Preciso", gridX + colWidths[0] + colWidths[1] + colWidths[2] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("Punti Ottenuti", gridX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] / 2, currentGridY + 4, { align: 'center' });
+            currentGridY += cellHeight;
+
+            // Riga Pratica
+            doc.setFont('Inter', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.setFillColor(249, 250, 251); // Gray-50
+            doc.rect(gridX, currentGridY, gridWidth, cellHeight, 'F');
+            doc.text("Pratica (Correttezza del Codice/Output)", gridX + colWidths[0] / 2, currentGridY + 4, { align: 'center' });
+            doc.text(`${ex.P}`, gridX + colWidths[0] + colWidths[1] / 2, currentGridY + 4, { align: 'center' });
+            doc.text(`${ex.P}`, gridX + colWidths[0] + colWidths[1] + colWidths[2] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("___________", gridX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] / 2, currentGridY + 4, { align: 'center' });
+            currentGridY += cellHeight;
+
+            // Riga Teorica
+            doc.setFillColor(255, 255, 255); 
+            doc.rect(gridX, currentGridY, gridWidth, cellHeight, 'F');
+            doc.text("Teoria (Spiegazione e Giustificazione Logica)", gridX + colWidths[0] / 2, currentGridY + 4, { align: 'center' });
+            doc.text(`${ex.T}`, gridX + colWidths[0] + colWidths[1] / 2, currentGridY + 4, { align: 'center' });
+            doc.text(`${ex.T}`, gridX + colWidths[0] + colWidths[1] + colWidths[2] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("___________", gridX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] / 2, currentGridY + 4, { align: 'center' });
+            currentGridY += cellHeight;
+
+            // Riga Punteggio MINIMO (Non Chiaro)
+            doc.setFont('Inter', 'bold');
+            doc.setFillColor(254, 226, 226); // Red-100
+            doc.setTextColor(185, 28, 28); // Red-700
+            doc.rect(gridX, currentGridY, gridWidth, cellHeight, 'F');
+            doc.text("MINIMO GARANTITO (Risposta non chiara)", gridX + colWidths[0] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("0.50", gridX + colWidths[0] + colWidths[1] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("0.50", gridX + colWidths[0] + colWidths[1] + colWidths[2] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("___________", gridX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] / 2, currentGridY + 4, { align: 'center' });
+            currentGridY += cellHeight;
+
+            // Riga Totale Esercizio
+            doc.setFont('Inter', 'black');
+            doc.setTextColor(17, 24, 39); // Gray-900
+            doc.setFillColor(209, 213, 219); // Gray-300
+            doc.rect(gridX, currentGridY, gridWidth, cellHeight, 'F');
+            doc.text("Totale Esercizio", gridX + colWidths[0] / 2, currentGridY + 4, { align: 'center' });
+            doc.text(`${ex.Total}`, gridX + colWidths[0] + colWidths[1] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("N/A", gridX + colWidths[0] + colWidths[1] + colWidths[2] / 2, currentGridY + 4, { align: 'center' });
+            doc.text("___________", gridX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] / 2, currentGridY + 4, { align: 'center' });
+            currentGridY += cellHeight;
+            
+            // Bordi della griglia
+            doc.setDrawColor(100, 116, 139); // Slate-500
+            doc.setLineWidth(0.3);
+            for(let j=0; j<=5; j++) doc.line(gridX, gridY + cellHeight * j, gridX + gridWidth, gridY + cellHeight * j); // Righe orizzontali
+            
+            let xPos = gridX;
+            doc.line(xPos, gridY, xPos, currentGridY); // Colonna 1
+            xPos += colWidths[0];
+            doc.line(xPos, gridY, xPos, currentGridY); // Colonna 2
+            xPos += colWidths[1];
+            doc.line(xPos, gridY, xPos, currentGridY); // Colonna 3
+            xPos += colWidths[2];
+            doc.line(xPos, gridY, xPos, currentGridY); // Colonna 4
+            xPos += colWidths[3];
+            doc.line(xPos, gridY, xPos, currentGridY); // Colonna 5 (Fine)
+
+            y = currentGridY + 5; 
+
+            // Domande Mirate e Personali (STUDENTE)
+            doc.setFont('Inter', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(75, 85, 99); 
+
+            const question1 = `1. Giustificazione Logica (Valore ${ex.T} Punti): Quale struttura di controllo (for, while, do-while) hai ritenuto più adatta per questo specifico problema? Fornisci una giustificazione personale sulla sua efficienza rispetto alle alternative, considerando i requisiti di inizializzazione e test.`;
+            const question2 = `2. Analisi Critica (Valore ${ex.T} Punti): Nello svolgimento di questo esercizio, descrivi il ruolo cruciale di un particolare operatore logico (AND, OR, NOT) o unario (++ / --), o di una variabile temporanea/booleana. Spiega personalmente dove risiedeva la maggiore difficoltà concettuale o il potenziale punto di errore.`;
+            
+            y = printWrappedText(doc, question1, margin, y, textWidth, 4.5) + 1;
+            y = printWrappedText(doc, question2, margin, y, textWidth, 4.5) + 3;
+            
+            // Linee per la Risposta 
+            doc.setDrawColor(209, 213, 219);
+            const numLines = 8; 
+            for (let j = 0; j < numLines; j++) {
+                doc.line(margin, y + j * lineHeight, pageWidth - margin, y + j * lineHeight);
+            }
+            y += numLines * lineHeight + 5;
+        }
+        
+        // --- Finalizzazione Spiegazioni (Aggiorna Totale Pagine) ---
+        const totalPagesSections = doc.internal.pages.length - 1;
+        drawFooter(doc, totalPagesSections, '?', false);
+        
+        
+        // ======================= ULTIMA PAGINA: GRIGLIA DI CONVERSIONE =======================
+        doc.addPage();
+        y = drawHeaderStudent(doc);
+        y += 5;
+        
+        // Titolo Griglia
+        doc.setFont('Inter', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(153, 27, 27); 
+        doc.text(`GRIGLIA DI CONVERSIONE PUNTEGGIO FINALE (Max 100 a 10)`, pageWidth / 2, y, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+        y += 8;
+
+        // Tabella di Conversione
+        const tableX = margin + 40; 
+        const tableY = y + 5;
+        const totalTableWidth = pageWidth - 2 * margin - 80;
+        const colWidth = totalTableWidth / 2;
+        const cellHeight = 10;
+        
+        const scoresToConvert = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
+        const grades = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+        
+        const headerFill = [191, 219, 254]; 
+        const headerText = [30, 64, 175];   
+        const bodyFill1 = [243, 244, 246];  
+        
+        // Intestazione Tabella
+        doc.setFillColor(...headerFill);
+        doc.rect(tableX, tableY, totalTableWidth, cellHeight, 'F');
+        doc.setFont('Inter', 'bold');
+        doc.setTextColor(...headerText);
+        doc.text("Punti Ottenuti (Max 100)", tableX + colWidth * 0.5, tableY + 6, { align: 'center' });
+        doc.text("Voto Finale (Max 10)", tableX + colWidth * 1.5, tableY + 6, { align: 'center' });
+        
+        // Righe di Contenuto
+        doc.setFont('Inter', 'normal');
+        doc.setTextColor(0, 0, 0);
+        for (let j = 0; j < scoresToConvert.length; j++) {
+            const currentY = tableY + cellHeight * (j + 1);
+            doc.setFillColor(j % 2 === 0 ? bodyFill1[0] : 255, j % 2 === 0 ? bodyFill1[1] : 255, j % 2 === 0 ? bodyFill1[2] : 255);
+            doc.rect(tableX, currentY, totalTableWidth, cellHeight, 'F');
+            
+            doc.text(`>= ${scoresToConvert[j]}`, tableX + colWidth * 0.5, currentY + 6, { align: 'center' });
+            doc.text(`${grades[j]}`, tableX + colWidth * 1.5, currentY + 6, { align: 'center' });
+        }
+        
+        // Bordi
+        doc.setDrawColor(209, 213, 219); 
+        doc.setLineWidth(0.3);
+        for (let j = 0; j <= scoresToConvert.length; j++) {
+            doc.line(tableX, tableY + cellHeight * j, tableX + totalTableWidth, tableY + cellHeight * j);
+        }
+        doc.line(tableX, tableY, tableX, tableY + cellHeight * (scoresToConvert.length + 1));
+        doc.line(tableX + colWidth, tableY, tableX + colWidth, tableY + cellHeight * (scoresToConvert.length + 1));
+        doc.line(tableX + totalTableWidth, tableY, tableX + totalTableWidth, tableY + cellHeight * (scoresToConvert.length + 1));
+        
+        // Note
+        y = tableY + cellHeight * (scoresToConvert.length + 1) + 10;
+        doc.setFontSize(10);
+        doc.setTextColor(75, 85, 99); 
+        doc.text('NB: Il punteggio finale terrà conto della correttezza concettuale, dell\'accuratezza e della precisione delle risposte fornite in Sezione B.', margin, y);
+        
+        // --- Finalizzazione Griglia ---
+        const totalPagesFinal = doc.internal.pages.length - 1;
+        drawFooter(doc, totalPagesFinal, '?', false);
+        
+        // Aggiorna i numeri di pagina totali
+        const totalPages = doc.internal.pages.length - 1; 
+        for (let k = 1; k <= totalPages; k++) {
+            doc.setPage(k);
+            drawFooter(doc, k, totalPages, false);
+        }
+
+        return doc.output('blob');
+    }
+
+    /**
+     * Genera il PDF *delle soluzioni* per il professore (con codice C++ completo).
+     * @param {number} studentId (Usiamo l'ID studente come seed per l'unicità)
+     * @returns {Promise<Blob>}
+     */
+    async function generateSolutionPdf(studentId) {
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        const textWidth = pageWidth - 2 * margin;
+        const lineHeight = 5;
+        let y = 0;
+        const exercises = getStudentExercises(studentId); 
+        
+        y = drawHeaderSolution(doc, studentId);
+        y += 5;
+
+        // Titolo Principale
+        doc.setFont('Inter', 'black');
+        doc.setFontSize(18);
+        doc.setTextColor(153, 27, 27); // Deep Red
+        doc.text(`SOLUZIONI DETTAGLIATE UNIVOCHE (Alunno ${studentId})`, pageWidth / 2, y, { align: 'center' });
+        doc.setTextColor(0, 0, 0); 
+        y += 10;
+
+        for (let i = 0; i < exercises.length; i++) {
+            const ex = exercises[i];
+            
+            // Salto pagina preventivo
+            if (y > pageHeight - 60) {
+                drawFooter(doc, doc.internal.pages.length - 1, '?', true);
+                doc.addPage();
+                y = drawHeaderSolution(doc, studentId);
+                y += 10;
+            }
+            
+            // --- INTESTAZIONE ESERCIZIO ---
+            doc.setFont('Inter', 'black');
+            doc.setFontSize(14);
+            doc.setTextColor(4, 120, 87); // Green-600
+            doc.text(`ESERCIZIO ${ex.id} (${ex.Total} Punti)`, margin, y);
+            y += 7;
+            
+            // 1. TRACCIA (Con i valori unici di seed)
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(30, 64, 175); // Blue
+            doc.text(`A. TRACCIA ASSEGNATA (PARAMETRI SPECIFICI):`, margin, y);
+            y += 5;
+            doc.setFont('Inter', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            y = printWrappedText(doc, ex.trace, margin, y, textWidth, 4.5) + 5; 
+
+            // 2. CODICE C++ COMPLETO
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(101, 163, 13); // Lime Green
+            doc.text(`B. CODICE C++ COMPLETO PER LA SOLUZIONE:`, margin, y);
+            y += 5;
+            
+            // Stampa blocco di codice completo e dettagliato
+            const codeBlock = `// Codice completo e funzionante per l'Alunno ${studentId}\n${ex.solutionCode}`;
+            const codeLines = codeBlock.split('\n').length;
+            const codeHeight = codeLines * 4.5 + 4; 
+            
+            if (y + codeHeight + 5 > pageHeight - 20) {
+                drawFooter(doc, doc.internal.pages.length - 1, '?', true);
+                doc.addPage();
+                y = drawHeaderSolution(doc, studentId);
+                y += 10;
+            }
+
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(9);
+            doc.setFillColor(245, 255, 245); // Very Light Green Background
+            doc.rect(margin, y, textWidth, codeHeight, 'F');
+            
+            y = printWrappedText(doc, codeBlock, margin + 2, y + 3, textWidth - 4, 4.5, true) + 2; 
+            
+            y += 5; 
+            
+            // 3. RISULTATO ATTESO
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(234, 88, 12); // Orange-600
+            doc.text(`C. RISULTATO/OUTPUT ATTESO (${ex.P} Punti Pratica):`, margin, y);
+            y += 5;
+            doc.setFont('Inter', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            y = printWrappedText(doc, ex.solution, margin, y, textWidth, 4.5) + 5; 
+
+            // 4. SPIEGAZIONE CONCETTUALE
+            doc.setFont('Inter', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(185, 28, 28); // Red-700
+            doc.text(`D. SPIEGAZIONE E GIUSTIFICAZIONE CONCETTUALE (${ex.T} Punti Teoria):`, margin, y);
+            y += 5;
+            doc.setFont('Inter', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            y = printWrappedText(doc, ex.explanation, margin, y, textWidth, 4.5) + 8;
+        }
+
+        // Finalizza le pagine del Soluzioni
+        const totalPages = doc.internal.pages.length - 1; 
+        for (let k = 1; k <= totalPages; k++) {
+            doc.setPage(k);
+            drawFooter(doc, k, totalPages, true);
+        }
+        
+        return doc.output('blob');
+    }
+
+    /**
+     * Funzione principale per generare e zippare le verifiche e le soluzioni.
+     */
+    async function generateTests() {
+        const numAlunni = parseInt(document.getElementById('numAlunni').value);
+        const statusMessage = document.getElementById('statusMessage');
+        const generateBtn = document.getElementById('generateBtn');
+
+        if (isNaN(numAlunni) || numAlunni < 1) {
+            statusMessage.textContent = 'Inserisci un numero valido di alunni (minimo 1).';
+            return;
+        }
+
+        statusMessage.textContent = 'Inizio generazione...';
+        generateBtn.disabled = true;
+
+        const zip = new JSZip();
+        
+        try {
+            // Generazione accoppiata (Verifica e Soluzione) per ogni alunno
+            for (let i = 1; i <= numAlunni; i++) {
+                statusMessage.textContent = `Generazione verifica e soluzione per l'alunno ${i} di ${numAlunni}...`;
+                
+                // 1. Generazione Verifica Studente
+                const studentPdfBlob = await generateStudentPdf(i);
+                zip.file(`Verifica_Programmazione_Alunno_${i}.pdf`, studentPdfBlob);
+                
+                // 2. Generazione Soluzione Professore (con lo stesso seed/contenuto dello studente i)
+                const solutionPdfBlob = await generateSolutionPdf(i);
+                zip.file(`Soluzioni_Professore_Alunno_${i}.pdf`, solutionPdfBlob);
+            }
+            
+
+            statusMessage.textContent = 'Creazione file ZIP...';
+            const content = await zip.generateAsync({ type: "blob" });
+            
+            // Scarica il file ZIP
+            const date = new Date().toISOString().slice(0, 10);
+            const filename = `Verifiche_E_Soluzioni_C++_Prof_Borzumati_${date}.zip`;
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            statusMessage.textContent = `Operazione completata! Scaricato: ${filename} (Contiene ${numAlunni * 2} file)`;
+
+        } catch (error) {
+            statusMessage.textContent = `Errore durante la generazione: ${error.message}`;
+            console.error("Errore di generazione PDF/ZIP:", error);
+        } finally {
+            generateBtn.disabled = false;
+        }
+    }
+    
+    window.jsPDF = jsPDF;
+    jsPDF.autoPrint = false; 
+
+</script>
+
+</body>
+</html>
+ 
